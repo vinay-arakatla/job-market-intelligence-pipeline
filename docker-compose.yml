@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: job-market-db
+    environment:
+      POSTGRES_DB: job_market_db
+      POSTGRES_USER: job_user
+      POSTGRES_PASSWORD: job_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - job-network
+
+  airflow:
+    build: .
+    container_name: job-market-airflow
+    environment:
+      AIRFLOW_HOME: /app/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://job_user:job_password@postgres:5432/airflow
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: job_market_db
+      DB_USER: job_user
+      DB_PASSWORD: job_password
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/app/dags
+      - ./logs:/app/logs
+      - ./src:/app/src
+    depends_on:
+      - postgres
+    networks:
+      - job-network
+    command: >
+      /bin/bash -c "
+      airflow db init &&
+      airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin || true &&
+      airflow webserver
+      "
+
+volumes:
+  postgres_data:
+
+networks:
+  job-network:
+    driver: bridge
